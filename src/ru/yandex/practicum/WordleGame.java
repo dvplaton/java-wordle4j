@@ -10,6 +10,10 @@ public class WordleGame {
     private static final int MAX_ATTEMPTS = 6;
     private static final int WORD_LENGTH = 5;
 
+    public enum LetterMatch {
+        CORRECT, PRESENT, ABSENT
+    }
+
     private final String answer;
     private int steps;
     private final WordleDictionary dictionary;
@@ -17,7 +21,7 @@ public class WordleGame {
 
     // история
     private final List<String> guesses;
-    private final List<WordleDictionary.LetterMatch[]> results;
+    private final List<LetterMatch[]> results;
 
     // накопленные знания
     private final Set<Character> absentLetters;
@@ -56,17 +60,101 @@ public class WordleGame {
         logState();
     }
 
-    // trim + lowercase
+    // сравнение
+    public LetterMatch[] compareWords(String guess, String secret) {
+        if (guess == null || secret == null) {
+            throw new RuntimeException("compareWords: аргументы не могут быть null");
+        }
+        if (guess.length() != secret.length()) {
+            throw new RuntimeException("compareWords: длины слов не совпадают: " + guess.length() + " vs " + secret.length());
+        }
+
+        int length = secret.length();
+        LetterMatch[] result = new LetterMatch[length];
+
+        char[] guessChars = guess.toLowerCase().toCharArray();
+        char[] secretChars = secret.toLowerCase().toCharArray();
+
+        int[] remainingCount = new int[Character.MAX_VALUE];
+
+        for (int i = 0; i < length; i++) {
+            if (guessChars[i] == secretChars[i]) {
+                result[i] = LetterMatch.CORRECT;
+            } else {
+                remainingCount[secretChars[i]]++;
+            }
+        }
+
+        for (int i = 0; i < length; i++) {
+            if (result[i] == LetterMatch.CORRECT) {
+                continue;
+            }
+            if (remainingCount[guessChars[i]] > 0) {
+                result[i] = LetterMatch.PRESENT;
+                remainingCount[guessChars[i]]--;
+            } else {
+                result[i] = LetterMatch.ABSENT;
+            }
+        }
+
+        log("Сравнение: " + guess + " vs " + secret + " -> " + matchesToString(result));
+        return result;
+    }
+
+    public boolean isExactMatch(String guess, String secret) {
+        return guess.equalsIgnoreCase(secret);
+    }
+
+    public String matchesToString(LetterMatch[] matches) {
+        StringBuilder sb = new StringBuilder(matches.length);
+        for (LetterMatch match : matches) {
+            switch (match) {
+                case CORRECT:
+                    sb.append("🟩");
+                    break;
+                case PRESENT:
+                    sb.append("🟨");
+                    break;
+                case ABSENT:
+                    sb.append("⬜");
+                    break;
+            }
+        }
+        return sb.toString();
+    }
+
+    public String formatGuessResult(String guess, LetterMatch[] matches) {
+        StringBuilder sb = new StringBuilder(guess.length() * 6);
+        for (int i = 0; i < guess.length(); i++) {
+            if (i > 0) sb.append(' ');
+            sb.append(Character.toUpperCase(guess.charAt(i)));
+            switch (matches[i]) {
+                case CORRECT:
+                    sb.append("[🟩]");
+                    break;
+                case PRESENT:
+                    sb.append("[🟨]");
+                    break;
+                case ABSENT:
+                    sb.append("[⬜]");
+                    break;
+            }
+        }
+        return sb.toString();
+    }
+
+
+    // trim + lowercase + ё=е
     public static String normalize(String input) {
         if (input == null) return "";
-        return input.trim().toLowerCase();
+        return input.trim().toLowerCase().replace('ё', 'е');
     }
 
     // только русские буквы
     public static boolean isRussianLettersOnly(String word) {
         for (int i = 0; i < word.length(); i++) {
             char c = word.charAt(i);
-            if (!((c >= 'а' && c <= 'я') || c == 'ё')) {
+            if (!((c >= 'а' && c <= 'я'))) {
                 return false;
             }
         }
@@ -97,10 +185,10 @@ public class WordleGame {
         String normalized = normalize(input);
         validateGuess(normalized);
 
-        // Быстрая проверка на точное совпадение
-        boolean exact = dictionary.isExactMatch(normalized, answer);
+        // проверка на точное совпадение
+        boolean exact = isExactMatch(normalized, answer);
 
-        WordleDictionary.LetterMatch[] matchResult = dictionary.compareWords(normalized, answer);
+        LetterMatch[] matchResult = compareWords(normalized, answer);
 
         guesses.add(normalized);
         results.add(matchResult);
@@ -108,14 +196,14 @@ public class WordleGame {
 
         updateKnowledge(normalized, matchResult);
 
-        String formatted = dictionary.formatGuessResult(normalized, matchResult);
+        String formatted = formatGuessResult(normalized, matchResult);
         log("Попытка " + steps + ": " + normalized + " -> " + formatted + (exact ? " [ПОБЕДА]" : ""));
         logState();
 
         return formatted;
     }
 
-    private void updateKnowledge(String guess, WordleDictionary.LetterMatch[] matchResult) {
+    private void updateKnowledge(String guess, LetterMatch[] matchResult) {
         for (int i = 0; i < WORD_LENGTH; i++) {
             char letter = guess.charAt(i);
 
@@ -153,12 +241,10 @@ public class WordleGame {
 
         if (candidates.isEmpty()) {
             // Не должно происходить — ответ всегда должен быть среди кандидатов
-            throw new RuntimeException(
-                    "Алгоритм потерял решение! Ответ: " + answer
-                            + ", absent: " + absentLetters
-                            + ", present: " + presentLetters
-                            + ", correct: " + new String(correctLetters)
-            );
+            throw new RuntimeException("Алгоритм потерял решение! Ответ: " + answer
+                    + ", absent: " + absentLetters
+                    + ", present: " + presentLetters
+                    + ", correct: " + new String(correctLetters));
         }
 
         String hint = selectBestCandidate(candidates);
@@ -182,7 +268,7 @@ public class WordleGame {
     }
 
     boolean isWordCompatible(String word) {
-        // Не предлагаем уже использованные и уже подсказанные
+        // не использованные и не подсказанные
         if (guesses.contains(word) || givenHints.contains(word)) {
             return false;
         }
@@ -247,7 +333,7 @@ public class WordleGame {
 
     public boolean isWon() {
         if (guesses.isEmpty()) return false;
-        return dictionary.isExactMatch(guesses.getLast(), answer);
+        return isExactMatch(guesses.getLast(), answer);
     }
 
     public int getCurrentAttempt() {
@@ -266,7 +352,7 @@ public class WordleGame {
         return Collections.unmodifiableList(guesses);
     }
 
-    public List<WordleDictionary.LetterMatch[]> getResults() {
+    public List<LetterMatch[]> getResults() {
         return Collections.unmodifiableList(results);
     }
 
@@ -284,7 +370,7 @@ public class WordleGame {
 
         for (int i = 0; i < guesses.size(); i++) {
             sb.append("  ").append(i + 1).append(". ");
-            sb.append(dictionary.formatGuessResult(guesses.get(i), results.get(i)));
+            sb.append(formatGuessResult(guesses.get(i), results.get(i)));
             sb.append('\n');
         }
         for (int i = guesses.size(); i < MAX_ATTEMPTS; i++) {
@@ -301,8 +387,7 @@ public class WordleGame {
     public String getResultAsString() {
         StringBuilder sb = new StringBuilder();
         if (isWon()) {
-            sb.append("Поздравляем! Вы угадали слово \"").append(answer)
-                    .append("\" за ").append(steps).append(" попыток!");
+            sb.append("Поздравляем! Вы угадали слово \"").append(answer).append("\" за ").append(steps).append(" попыток!");
         } else if (steps >= MAX_ATTEMPTS) {
             sb.append("Вы проиграли. Загаданное слово: ").append(answer);
         } else {
@@ -333,8 +418,7 @@ public class WordleGame {
 
     private void log(String message) {
         if (logWriter != null) {
-            String timestamp = LocalDateTime.now()
-                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             logWriter.println("[" + timestamp + "] [Game] " + message);
             logWriter.flush();
         }

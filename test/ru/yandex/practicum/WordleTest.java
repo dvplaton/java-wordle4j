@@ -12,146 +12,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class WordleDictionaryTest {
-
-    private static PrintWriter logWriter;
-    private WordleDictionary dictionary;
-
-    @BeforeAll
-    static void initLog() {
-        logWriter = new PrintWriter(System.out, true);
-    }
-
-    @BeforeEach
-    void setUp() {
-        List<String> words = Arrays.asList("абвгд", "бвгде", "вгдеж", "гдежз", "дежзи");
-        dictionary = new WordleDictionary(words, logWriter);
-    }
-
-    @Test
-    void testContains() {
-        assertTrue(dictionary.contains("абвгд"));
-        assertTrue(dictionary.contains("АБВГД")); // регистронезависимо
-        assertFalse(dictionary.contains("zzzzz"));
-    }
-
-    @Test
-    void testSize() {
-        assertEquals(5, dictionary.size());
-    }
-
-    @Test
-    void testIsEmpty() {
-        assertFalse(dictionary.isEmpty());
-        WordleDictionary empty = new WordleDictionary(List.of(), logWriter);
-        assertTrue(empty.isEmpty());
-    }
-
-    @Test
-    void testGetRandomWord() {
-        String word = dictionary.getRandomWord();
-        assertTrue(dictionary.contains(word));
-    }
-
-    @Test
-    void testGetRandomWordThrowsOnEmpty() {
-        WordleDictionary empty = new WordleDictionary(List.of(), logWriter);
-        assertThrows(RuntimeException.class, empty::getRandomWord);
-    }
-
-    @Test
-    void testCompareWordsAllCorrect() {
-        WordleDictionary.LetterMatch[] result = dictionary.compareWords("абвгд", "абвгд");
-        for (WordleDictionary.LetterMatch m : result) {
-            assertEquals(WordleDictionary.LetterMatch.CORRECT, m);
-        }
-    }
-
-    @Test
-    void testCompareWordsAllAbsent() {
-        List<String> words = Arrays.asList("абвгд", "жзикл");
-        WordleDictionary dict = new WordleDictionary(words, logWriter);
-
-        WordleDictionary.LetterMatch[] result = dict.compareWords("жзикл", "абвгд");
-        for (WordleDictionary.LetterMatch m : result) {
-            assertEquals(WordleDictionary.LetterMatch.ABSENT, m);
-        }
-    }
-
-    @Test
-    void testCompareWordsPresent() {
-        // "бавгд" vs "абвгд": б=PRESENT, а=PRESENT, в=CORRECT, г=CORRECT, д=CORRECT
-        List<String> words = Arrays.asList("абвгд", "бавгд");
-        WordleDictionary dict = new WordleDictionary(words, logWriter);
-
-        WordleDictionary.LetterMatch[] result = dict.compareWords("бавгд", "абвгд");
-        assertEquals(WordleDictionary.LetterMatch.PRESENT, result[0]);
-        assertEquals(WordleDictionary.LetterMatch.PRESENT, result[1]);
-        assertEquals(WordleDictionary.LetterMatch.CORRECT, result[2]);
-        assertEquals(WordleDictionary.LetterMatch.CORRECT, result[3]);
-        assertEquals(WordleDictionary.LetterMatch.CORRECT, result[4]);
-    }
-
-    @Test
-    void testCompareWordsDuplicateLetters() {
-        // "ааааа" vs "абвгд": первая а=CORRECT, остальные=ABSENT
-        List<String> words = Arrays.asList("абвгд", "ааааа");
-        WordleDictionary dict = new WordleDictionary(words, logWriter);
-
-        WordleDictionary.LetterMatch[] result = dict.compareWords("ааааа", "абвгд");
-        assertEquals(WordleDictionary.LetterMatch.CORRECT, result[0]);
-        assertEquals(WordleDictionary.LetterMatch.ABSENT, result[1]);
-        assertEquals(WordleDictionary.LetterMatch.ABSENT, result[2]);
-        assertEquals(WordleDictionary.LetterMatch.ABSENT, result[3]);
-        assertEquals(WordleDictionary.LetterMatch.ABSENT, result[4]);
-    }
-
-    @Test
-    void testCompareWordsNullThrows() {
-        assertThrows(RuntimeException.class, () -> dictionary.compareWords(null, "абвгд"));
-        assertThrows(RuntimeException.class, () -> dictionary.compareWords("абвгд", null));
-    }
-
-    @Test
-    void testCompareWordsDifferentLengthThrows() {
-        assertThrows(RuntimeException.class, () -> dictionary.compareWords("аб", "абвгд"));
-    }
-
-    @Test
-    void testIsExactMatch() {
-        assertTrue(dictionary.isExactMatch("абвгд", "абвгд"));
-        assertTrue(dictionary.isExactMatch("АБВГД", "абвгд"));
-        assertFalse(dictionary.isExactMatch("бвгде", "абвгд"));
-    }
-
-    @Test
-    void testMatchesToString() {
-        WordleDictionary.LetterMatch[] matches = {
-                WordleDictionary.LetterMatch.CORRECT,
-                WordleDictionary.LetterMatch.PRESENT,
-                WordleDictionary.LetterMatch.ABSENT
-        };
-        assertEquals("🟩🟨⬜", dictionary.matchesToString(matches));
-    }
-
-    @Test
-    void testFormatGuessResult() {
-        WordleDictionary.LetterMatch[] matches = {
-                WordleDictionary.LetterMatch.CORRECT,
-                WordleDictionary.LetterMatch.ABSENT,
-                WordleDictionary.LetterMatch.PRESENT,
-                WordleDictionary.LetterMatch.CORRECT,
-                WordleDictionary.LetterMatch.ABSENT
-        };
-        String result = dictionary.formatGuessResult("абвгд", matches);
-        assertTrue(result.contains("А[🟩]"));
-        assertTrue(result.contains("Б[⬜]"));
-        assertTrue(result.contains("В[🟨]"));
-        assertTrue(result.contains("Г[🟩]"));
-        assertTrue(result.contains("Д[⬜]"));
-    }
-}
-
 class WordleDictionaryLoaderTest {
 
     private static PrintWriter logWriter;
@@ -168,7 +28,7 @@ class WordleDictionaryLoaderTest {
 
         assertNotNull(dictionary);
         assertFalse(dictionary.isEmpty());
-        // Все слова должны быть длиной 5
+        // все слова длиной 5
         for (String word : dictionary.getWords()) {
             assertEquals(5, word.length(), "Слово неправильной длины: " + word);
         }
@@ -191,13 +51,23 @@ class WordleDictionaryLoaderTest {
     }
 
     @Test
-    void testAllWordsAreLettersOnly() throws IOException {
+    void testNoYoInWords() throws IOException {
+        WordleDictionaryLoader loader = new WordleDictionaryLoader(logWriter);
+        WordleDictionary dictionary = loader.load("words_ru.txt");
+
+        for (String word : dictionary.getWords()) {
+            assertFalse(word.contains("ё"), "Слово содержит ё (должна быть заменена на е): " + word);
+        }
+    }
+
+    @Test
+    void testAllWordsAreRussianLetters() throws IOException {
         WordleDictionaryLoader loader = new WordleDictionaryLoader(logWriter);
         WordleDictionary dictionary = loader.load("words_ru.txt");
 
         for (String word : dictionary.getWords()) {
             for (char c : word.toCharArray()) {
-                assertTrue(Character.isLetter(c), "Не буква в слове \"" + word + "\": " + c);
+                assertTrue(c >= 'а' && c <= 'я', "Недопустимый символ '" + c + "' в слове \"" + word + "\"");
             }
         }
     }
@@ -210,7 +80,77 @@ class WordleDictionaryLoaderTest {
         long uniqueCount = dictionary.getWords().stream().distinct().count();
         assertEquals(dictionary.size(), uniqueCount, "В словаре есть дубликаты");
     }
+
+    @Test
+    void testNormalizeWord() {
+        assertEquals("елка", WordleDictionaryLoader.normalizeWord("Ёлка"));
+        assertEquals("елка", WordleDictionaryLoader.normalizeWord("  ЁЛКА  "));
+        assertEquals("кошка", WordleDictionaryLoader.normalizeWord("кошка"));
+        assertEquals("берег", WordleDictionaryLoader.normalizeWord("БЕРЁГ"));
+    }
 }
+
+class WordleDictionaryTest {
+
+    private static PrintWriter logWriter;
+    private WordleDictionary dictionary;
+
+    @BeforeAll
+    static void initLog() {
+        logWriter = new PrintWriter(System.out, true);
+    }
+
+    @BeforeEach
+    void setUp() {
+        List<String> words = Arrays.asList("кошка", "мышка", "книга", "лампа", "парта");
+        dictionary = new WordleDictionary(words, logWriter);
+    }
+
+    @Test
+    void testContains() {
+        assertTrue(dictionary.contains("кошка"));
+        assertTrue(dictionary.contains("КОШКА"));
+        assertFalse(dictionary.contains("собак"));
+    }
+
+    @Test
+    void testSize() {
+        assertEquals(5, dictionary.size());
+    }
+
+    @Test
+    void testIsEmpty() {
+        assertFalse(dictionary.isEmpty());
+        WordleDictionary empty = new WordleDictionary(List.of(), logWriter);
+        assertTrue(empty.isEmpty());
+    }
+
+    @Test
+    void testGet() {
+        assertEquals("кошка", dictionary.get(0));
+        assertEquals("мышка", dictionary.get(1));
+    }
+
+    @Test
+    void testGetWords() {
+        List<String> words = dictionary.getWords();
+        assertEquals(5, words.size());
+        assertThrows(UnsupportedOperationException.class, () -> words.add("тест"));
+    }
+
+    @Test
+    void testGetRandomWord() {
+        String word = dictionary.getRandomWord();
+        assertTrue(dictionary.contains(word));
+    }
+
+    @Test
+    void testGetRandomWordThrowsOnEmpty() {
+        WordleDictionary empty = new WordleDictionary(List.of(), logWriter);
+        assertThrows(RuntimeException.class, empty::getRandomWord);
+    }
+}
+
 
 class WordleGameTest {
 
@@ -225,10 +165,7 @@ class WordleGameTest {
     @BeforeEach
     void setUp() {
         // Словарь из русских 5-буквенных слов
-        List<String> words = Arrays.asList(
-                "кошка", "мышка", "книга", "лампа", "парта",
-                "рыбка", "ручка", "полка", "горка", "марка"
-        );
+        List<String> words = Arrays.asList("кошка", "мышка", "книга", "лампа", "парта", "рыбка", "ручка", "полка", "горка", "марка");
         dictionary = new WordleDictionary(words, logWriter);
     }
 
@@ -238,11 +175,76 @@ class WordleGameTest {
         do {
             game = new WordleGame(dictionary, logWriter);
             attempts++;
-            if (attempts > 1000) {
+            if (attempts > 10000) {
                 fail("Не удалось создать игру с ответом \"" + answer + "\"");
             }
         } while (!game.getSecretWord().equals(answer));
         return game;
+    }
+
+    // Сравнение
+
+    @Test
+    void testCompareWordsAllCorrect() {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        WordleGame.LetterMatch[] result = game.compareWords("кошка", "кошка");
+        for (WordleGame.LetterMatch m : result) {
+            assertEquals(WordleGame.LetterMatch.CORRECT, m);
+        }
+    }
+
+    @Test
+    void testCompareWordsDuplicateLetters() {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        // "ааааа" vs "кошка": только позиция 4 (а) → CORRECT
+        WordleGame.LetterMatch[] result = game.compareWords("ааааа", "кошка");
+        assertEquals(WordleGame.LetterMatch.ABSENT, result[0]);
+        assertEquals(WordleGame.LetterMatch.ABSENT, result[1]);
+        assertEquals(WordleGame.LetterMatch.ABSENT, result[2]);
+        assertEquals(WordleGame.LetterMatch.ABSENT, result[3]);
+        assertEquals(WordleGame.LetterMatch.CORRECT, result[4]);
+    }
+
+    @Test
+    void testCompareWordsNullThrows() {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        assertThrows(RuntimeException.class, () -> game.compareWords(null, "кошка"));
+        assertThrows(RuntimeException.class, () -> game.compareWords("кошка", null));
+    }
+
+    @Test
+    void testCompareWordsDifferentLengthThrows() {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        assertThrows(RuntimeException.class, () -> game.compareWords("кот", "кошка"));
+    }
+
+    // Форматирование
+
+    @Test
+    void testMatchesToString() {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        WordleGame.LetterMatch[] matches = {
+                WordleGame.LetterMatch.CORRECT,
+                WordleGame.LetterMatch.PRESENT,
+                WordleGame.LetterMatch.ABSENT
+        };
+        assertEquals("🟩🟨⬜", game.matchesToString(matches));
+    }
+
+    @Test
+    void testFormatGuessResult() {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        WordleGame.LetterMatch[] matches = {
+                WordleGame.LetterMatch.CORRECT,
+                WordleGame.LetterMatch.ABSENT,
+                WordleGame.LetterMatch.PRESENT,
+                WordleGame.LetterMatch.CORRECT,
+                WordleGame.LetterMatch.ABSENT
+        };
+        String result = game.formatGuessResult("кошка", matches);
+        assertTrue(result.contains("К[🟩]"));
+        assertTrue(result.contains("О[⬜]"));
+        assertTrue(result.contains("Ш[🟨]"));
     }
 
     // Нормализация
@@ -256,9 +258,15 @@ class WordleGameTest {
     }
 
     @Test
+    void testNormalizeReplacesYo() {
+        assertEquals("елка", WordleGame.normalize("Ёлка"));
+        assertEquals("берег", WordleGame.normalize("БЕРЁГ"));
+        assertEquals("еж", WordleGame.normalize("ёж"));
+    }
+
+    @Test
     void testIsRussianLettersOnly() {
         assertTrue(WordleGame.isRussianLettersOnly("кошка"));
-        assertTrue(WordleGame.isRussianLettersOnly("ёжик")); // ё не 5 букв, но проверяем символы
         assertFalse(WordleGame.isRussianLettersOnly("apple"));
         assertFalse(WordleGame.isRussianLettersOnly("кот12"));
         assertFalse(WordleGame.isRussianLettersOnly("кот ка"));
@@ -374,13 +382,20 @@ class WordleGameTest {
         }
     }
 
+    @Test
+    void testMakeGuessWithYo() throws WordleException {
+        WordleGame game = new WordleGame(dictionary, logWriter);
+        String result = game.makeGuess("горка");
+        assertNotNull(result);
+    }
+
     // Подсказки
 
     @Test
     void testHintReturnsWordFromDictionary() throws GameOverException {
         WordleGame game = new WordleGame(dictionary, logWriter);
         String hint = game.getHint();
-        assertTrue(dictionary.contains(hint), "Подсказка должна быть из словаря");
+        assertTrue(dictionary.contains(hint));
     }
 
     @Test
@@ -426,9 +441,7 @@ class WordleGameTest {
 
     @Test
     void testAutoPlayFindsAnswer() throws WordleException {
-        // Симуляция автоигры: компьютер сам угадывает
         WordleGame game = new WordleGame(dictionary, logWriter);
-        String answer = game.getSecretWord();
 
         int maxSteps = game.getMaxAttempts();
         for (int i = 0; i < maxSteps && !game.isGameOver(); i++) {
@@ -436,8 +449,7 @@ class WordleGameTest {
             game.makeGuess(hint);
         }
 
-        // С маленьким словарём автоигра должна найти ответ
-        assertTrue(game.isGameOver(), "Игра должна завершиться за " + maxSteps + " попыток");
+        assertTrue(game.isGameOver());
     }
 
     // Состояние

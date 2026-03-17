@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Scanner;
 
 public class Wordle {
@@ -14,6 +16,16 @@ public class Wordle {
     public static void main(String[] args) {
         try (PrintWriter logWriter = new PrintWriter(new FileWriter(new File(LOG_FILE), true)); Scanner scanner = new Scanner(System.in)) {
 
+            run(logWriter, scanner);
+
+        } catch (IOException e) {
+            // невозможно открыть лог-файл
+            System.err.println("Невозможно создать лог-файл: " + e.getMessage());
+        }
+    }
+
+    private static void run(PrintWriter logWriter, Scanner scanner) {
+        try {
             log(logWriter, "=== Игра Wordle запущена ===");
 
             WordleDictionaryLoader loader = new WordleDictionaryLoader(logWriter);
@@ -24,7 +36,8 @@ public class Wordle {
 
             System.out.println("=== WORDLE ===");
             System.out.println("Угадайте слово из 5 русских букв. У вас 6 попыток.");
-            System.out.println("Команды: 'hint' — подсказка, 'auto' — автоигра, 'quit' — выход.");
+            System.out.println("Нажмите Enter на пустой строке для подсказки.");
+            System.out.println("Введите 'quit' для выхода.");
             System.out.println();
 
             while (!game.isGameOver()) {
@@ -32,6 +45,7 @@ public class Wordle {
                 String input = scanner.nextLine().trim();
 
                 if (input.isEmpty()) {
+                    handleHint(game, logWriter);
                     continue;
                 }
 
@@ -39,16 +53,6 @@ public class Wordle {
                     System.out.println("Вы вышли. Слово было: " + game.getSecretWord());
                     log(logWriter, "Игрок вышел");
                     return;
-                }
-
-                if (input.equalsIgnoreCase("hint")) {
-                    handleHint(game);
-                    continue;
-                }
-
-                if (input.equalsIgnoreCase("auto")) {
-                    autoPlay(game, scanner);
-                    break;
                 }
 
                 handleGuess(game, input);
@@ -60,10 +64,11 @@ public class Wordle {
             log(logWriter, "=== Игра завершена ===");
 
         } catch (IOException e) {
-            System.err.println("Ошибка файла: " + e.getMessage());
+            log(logWriter, "ОШИБКА IOException: " + e.getMessage());
+            logStackTrace(logWriter, e);
         } catch (RuntimeException e) {
-            System.err.println("Внутренняя ошибка: " + e.getMessage());
-            e.printStackTrace();
+            log(logWriter, "ОШИБКА RuntimeException: " + e.getMessage());
+            logStackTrace(logWriter, e);
         }
     }
 
@@ -84,42 +89,33 @@ public class Wordle {
         }
     }
 
-    private static void handleHint(WordleGame game) {
+    private static void handleHint(WordleGame game, PrintWriter logWriter) {
         try {
             String hint = game.getHint();
-            System.out.println("  Подсказка: попробуйте \"" + hint + "\"");
+            System.out.println("  Подсказка: " + hint);
+
+            // делаем ход подсказанным словом
+            String result = game.makeGuess(hint);
+            System.out.println("  " + result);
+            System.out.println();
+            System.out.println(game.getStateAsString());
+            System.out.println();
+
         } catch (GameOverException e) {
             System.out.println("  " + e.getMessage());
-        }
-    }
-
-    private static void autoPlay(WordleGame game, Scanner scanner) {
-        System.out.println("  Автоигра! Нажимайте Enter для каждого хода.");
-        System.out.println();
-
-        while (!game.isGameOver()) {
-            try {
-                String hint = game.getHint();
-                System.out.printf("  Попытка %d/%d — пробую \"%s\"... (Enter)", game.getCurrentAttempt() + 1, game.getMaxAttempts(), hint);
-                scanner.nextLine();
-
-                String result = game.makeGuess(hint);
-                System.out.println("  " + result);
-                System.out.println();
-                System.out.println(game.getStateAsString());
-                System.out.println();
-
-            } catch (GameOverException e) {
-                break;
-            } catch (WordleException e) {
-                System.out.println("  Ошибка автоигры: " + e.getMessage());
-                break;
-            }
+        } catch (WordleException e) {
+            System.out.println("  Ошибка: " + e.getMessage());
         }
     }
 
     private static void log(PrintWriter logWriter, String message) {
-        logWriter.println("[" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "] [Main] " + message);
+        logWriter.println("[" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "] [Main] " + message);
+        logWriter.flush();
+    }
+
+    private static void logStackTrace(PrintWriter logWriter, Exception e) {
+        logWriter.print("[" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + "] [Main] Стек вызовов: ");
+        e.printStackTrace(logWriter);
         logWriter.flush();
     }
 }

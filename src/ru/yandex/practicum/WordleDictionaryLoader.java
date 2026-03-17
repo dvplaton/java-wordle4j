@@ -47,11 +47,7 @@ public class WordleDictionaryLoader {
     private Path resolveFilePath(String fileName) throws FileNotFoundException {
         log("Рабочая директория: " + Paths.get("").toAbsolutePath());
 
-        Path[] candidates = {
-                Paths.get(fileName),
-                Paths.get("src", fileName),
-                Paths.get("src", "main", "resources", fileName)
-        };
+        Path[] candidates = {Paths.get(fileName), Paths.get("src", fileName), Paths.get("src", "main", "resources", fileName)};
 
         for (Path path : candidates) {
             log("Проверяю: " + path.toAbsolutePath());
@@ -71,18 +67,11 @@ public class WordleDictionaryLoader {
             }
         }
 
-        throw new FileNotFoundException(
-                "Файл \"" + fileName + "\" не найден. Рабочая директория: "
-                        + Paths.get("").toAbsolutePath()
-        );
+        throw new FileNotFoundException("Файл \"" + fileName + "\" не найден. Рабочая директория: " + Paths.get("").toAbsolutePath());
     }
 
     private Charset detectCharset(Path filePath) {
-        Charset[] charsets = {
-                StandardCharsets.UTF_8,
-                Charset.forName("Windows-1251"),
-                StandardCharsets.ISO_8859_1
-        };
+        Charset[] charsets = {StandardCharsets.UTF_8, Charset.forName("Windows-1251"), StandardCharsets.ISO_8859_1};
 
         for (Charset charset : charsets) {
             if (isValidCharset(filePath, charset)) {
@@ -123,9 +112,9 @@ public class WordleDictionaryLoader {
             String line;
             while ((line = reader.readLine()) != null) {
                 totalLines++;
-                String word = line.trim().toLowerCase();
+                String word = normalizeWord(line);
 
-                if (word.length() != EXPECTED_WORD_LENGTH || !isAllLetters(word)) {
+                if (word.length() != EXPECTED_WORD_LENGTH || !isAllRussianLetters(word)) {
                     skippedLines++;
                     continue;
                 }
@@ -138,9 +127,14 @@ public class WordleDictionaryLoader {
         return new ArrayList<>(wordSet);
     }
 
-    private boolean isAllLetters(String word) {
+    static String normalizeWord(String raw) {
+        return raw.trim().toLowerCase().replace('ё', 'е');
+    }
+
+    private boolean isAllRussianLetters(String word) {
         for (int i = 0; i < word.length(); i++) {
-            if (!Character.isLetter(word.charAt(i))) {
+            char c = word.charAt(i);
+            if (c < 'а' || c > 'я') {
                 return false;
             }
         }
@@ -149,8 +143,7 @@ public class WordleDictionaryLoader {
 
     private void log(String message) {
         if (logWriter != null) {
-            String timestamp = LocalDateTime.now()
-                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
             logWriter.println("[" + timestamp + "] [Loader] " + message);
             logWriter.flush();
         }
